@@ -66,10 +66,10 @@ public:
     void AddDocument(int document_id, const string& document) {
         const vector<string> words = SplitIntoWordsNoStop(document);
         ++document_count_; 
+        const double inverse_word_freq = 1.0 / double(words.size());
         for (const string& word : words){
-            double TF = count(words.begin(), words.end(), word) / double(words.size());
-            documents_[word].insert({document_id, TF});
-        } 
+            documents_[word][document_id] += inverse_word_freq;
+        }
     }
 
     vector<Document> FindTopDocuments(const string& raw_query) const {
@@ -87,11 +87,6 @@ public:
     }
 
 private:
-    
-    struct Query {
-        set<string> plus_words;
-        set<string> minus_words;
-    };
     
     map<string, map<int, double>> documents_;
 
@@ -113,17 +108,43 @@ private:
         return words;
     }
 
+    struct QueryWord {
+        string data;
+        bool is_minus;
+        bool is_stop;
+    };
+
+    QueryWord ParseQueryWord(string text) const {
+        bool is_minus = false;
+        if (text[0] == '-') {
+            is_minus = true;
+            text = text.substr(1);
+        }
+        return {text, is_minus, IsStopWord(text)};
+    }
+
+    struct Query {
+        set<string> plus_words;
+        set<string> minus_words;
+    };
+
     Query ParseQuery(const string& text) const {
-        Query query_words;
-        for (const string& word : SplitIntoWordsNoStop(text)) {
-            if (word[0] == '-'){
-                query_words.minus_words.insert(word.substr(1));
-            }
-            else{
-                query_words.plus_words.insert(word);
+        Query query;
+        for (const string& word : SplitIntoWords(text)) {
+            const QueryWord query_word = ParseQueryWord(word);
+            if (!query_word.is_stop) {
+                if (query_word.is_minus) {
+                    query.minus_words.insert(query_word.data);
+                } else {
+                    query.plus_words.insert(query_word.data);
+                }
             }
         }
-        return query_words;
+        return query;
+    }
+
+    double ComputeWordInverseDocumentFreq(const string& word) const {
+        return log(document_count_ / static_cast<double>(documents_.at(word).size()));
     }
 
     vector<Document> FindAllDocuments(const Query& query_words) const {
@@ -132,7 +153,7 @@ private:
         
         for (const string& word : query_words.plus_words){
             if (documents_.count(word)){
-                double IDF = log(document_count_ / double(documents_.at(word).size()));
+                double IDF = ComputeWordInverseDocumentFreq(word);
                 for (const auto& [id, TF] : documents_.at(word)){
                     document_to_relevance[id] += IDF * TF;
                 }
