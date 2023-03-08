@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 #include <optional>
+#include <numeric>
 
 using namespace std;
 
@@ -103,32 +104,32 @@ public:
         if(!IsValidWord(document)) {
             throw invalid_argument("Contains special characters"s);
         }
-        if (document_id < 0 || documents_.count(document_id) != 0) {
-            throw invalid_argument("Invalid id"s);
+        if (document_id < 0) {
+            throw invalid_argument("Negative id"s);
+        }
+        if (documents_.count(document_id) != 0) {
+            throw invalid_argument("Id is already available"s);
         }
         const vector<string> words = SplitIntoWordsNoStop(document);
         const double inv_word_count = 1.0 / words.size();
         for (const string& word : words) {
             word_to_document_freqs_[word][document_id] += inv_word_count;
         }
-        documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
+        int id_number = 0;
+        documents_.emplace(document_id, DocumentData{id_number, ComputeAverageRating(ratings), status});
+        ++id_number;
     }
 
     template <typename DocumentPredicate>
     vector<Document> FindTopDocuments(const string& raw_query,
                                       DocumentPredicate document_predicate) const {
-        if(!IsValidWord(raw_query)) {
-            throw invalid_argument("Contains special characters"s);
-        }
-        if(!CheckRawQuery(raw_query)) {
-            throw invalid_argument("Invalid request"s);
-        }
         const Query query = ParseQuery(raw_query);
         auto matched_documents = FindAllDocuments(query, document_predicate);
 
         sort(matched_documents.begin(), matched_documents.end(),
              [](const Document& lhs, const Document& rhs) {
-                 if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
+                 const double EPSILON = 1e-6;
+                 if (abs(lhs.relevance - rhs.relevance) < EPSILON) {
                      return lhs.rating > rhs.rating;
                  } else {
                      return lhs.relevance > rhs.relevance;
@@ -157,12 +158,6 @@ public:
 
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query,
                                                         int document_id) const {
-        if(!IsValidWord(raw_query)) {
-            throw invalid_argument("Contains special characters"s);
-        }
-        if(!CheckRawQuery(raw_query)) {
-            throw invalid_argument("Invalid request"s);
-        }
         const Query query = ParseQuery(raw_query);
         vector<string> matched_words;
         for (const string& word : query.plus_words) {
@@ -189,15 +184,19 @@ public:
         if(index > documents_.size() || documents_.empty()) {
             throw out_of_range("There is no such element"s);
         }
-        vector<int> Keys;
-        for(auto [keys, value] : documents_) {
-            Keys.push_back(keys);
+        int right_id;
+        for(auto [id, value] : documents_) {
+            if (value.id_number == index) {
+                right_id = id;
+                break;
+            }
         }
-        return Keys[index];    
+        return right_id;
     }
 
 private:
     struct DocumentData {
+        int id_number;
         int rating;
         DocumentStatus status;
     };
@@ -238,10 +237,7 @@ private:
         if (ratings.empty()) {
             return 0;
         }
-        int rating_sum = 0;
-        for (const int rating : ratings) {
-            rating_sum += rating;
-        }
+        int rating_sum = accumulate(ratings.begin(), ratings.end(), 0);
         return rating_sum / static_cast<int>(ratings.size());
     }
 
@@ -249,6 +245,7 @@ private:
         string data;
         bool is_minus;
         bool is_stop;
+        bool is_valid;
     };
 
     QueryWord ParseQueryWord(string text) const {
@@ -258,7 +255,7 @@ private:
             is_minus = true;
             text = text.substr(1);
         }
-        return {text, is_minus, IsStopWord(text)};
+        return {text, is_minus, IsStopWord(text), IsValidWord(text)};
     }
 
     struct Query {
@@ -268,8 +265,14 @@ private:
 
     Query ParseQuery(const string& text) const {
         Query query;
+        if(!CheckRawQuery(text)) {
+            throw invalid_argument("Invalid request"s);
+        }
         for (const string& word : SplitIntoWords(text)) {
             const QueryWord query_word = ParseQueryWord(word);
+            if (!query_word.is_valid) {
+                throw invalid_argument("Contains special characters"s);
+            }
             if (!query_word.is_stop) {
                 if (query_word.is_minus) {
                     query.minus_words.insert(query_word.data);
