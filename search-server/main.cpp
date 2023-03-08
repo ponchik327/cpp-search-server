@@ -115,9 +115,8 @@ public:
         for (const string& word : words) {
             word_to_document_freqs_[word][document_id] += inv_word_count;
         }
-        int id_number = 0;
-        documents_.emplace(document_id, DocumentData{id_number, ComputeAverageRating(ratings), status});
-        ++id_number;
+        documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
+        documentids_.push_back(document_id);
     }
 
     template <typename DocumentPredicate>
@@ -184,30 +183,23 @@ public:
         if(index > documents_.size() || documents_.empty()) {
             throw out_of_range("There is no such element"s);
         }
-        int right_id;
-        for(auto [id, value] : documents_) {
-            if (value.id_number == index) {
-                right_id = id;
-                break;
-            }
-        }
-        return right_id;
+        return documentids_[index];
     }
 
 private:
     struct DocumentData {
-        int id_number;
         int rating;
         DocumentStatus status;
     };
     const set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
+    vector<int> documentids_;
 
-    static bool CheckRawQuery(const string& raw_query) {
-        string bad_1 = "--"s;
-        string bad_2 = "- "s;
-        if(raw_query.find(bad_1) != -1 || raw_query.find(bad_2) != -1 || raw_query[raw_query.size() - 1] == '-') {
+    static bool CheckMinusInWord(const string& word) {
+        char minus = '-';
+        string empty = ""s;
+        if(word[0] == minus || word == empty) {
             return false;
         }
         return true;
@@ -246,6 +238,7 @@ private:
         bool is_minus;
         bool is_stop;
         bool is_valid;
+        bool is_valid_minus;
     };
 
     QueryWord ParseQueryWord(string text) const {
@@ -255,7 +248,7 @@ private:
             is_minus = true;
             text = text.substr(1);
         }
-        return {text, is_minus, IsStopWord(text), IsValidWord(text)};
+        return {text, is_minus, IsStopWord(text), IsValidWord(text), CheckMinusInWord(text)};
     }
 
     struct Query {
@@ -265,13 +258,13 @@ private:
 
     Query ParseQuery(const string& text) const {
         Query query;
-        if(!CheckRawQuery(text)) {
-            throw invalid_argument("Invalid request"s);
-        }
         for (const string& word : SplitIntoWords(text)) {
             const QueryWord query_word = ParseQueryWord(word);
             if (!query_word.is_valid) {
                 throw invalid_argument("Contains special characters"s);
+            }
+            if(!query_word.is_valid_minus) {
+                throw invalid_argument("Invalid request"s);
             }
             if (!query_word.is_stop) {
                 if (query_word.is_minus) {
