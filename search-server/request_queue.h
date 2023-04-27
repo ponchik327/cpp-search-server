@@ -10,7 +10,12 @@ public:
     explicit RequestQueue(SearchServer& search_server);
     // сделаем "обёртки" для всех методов поиска, чтобы сохранять результаты для нашей статистики
     template <typename DocumentPredicate>
-    std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate) ;
+    std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate) {
+        // напишите реализацию
+        auto answer = server_.FindTopDocuments(raw_query, document_predicate);
+        collecting_statistics(answer);
+        return answer;
+    }
     
     std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentStatus status) ;
     
@@ -34,11 +39,3 @@ private:
     void collecting_statistics(const std::vector<Document>& answer) ;
     
 };
-
-template <typename DocumentPredicate>
-    std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate) {
-        // напишите реализацию
-        auto answer = server_.FindTopDocuments(raw_query, document_predicate);
-        collecting_statistics(answer);
-        return answer;
-    }
