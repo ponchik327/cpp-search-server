@@ -59,8 +59,6 @@ private:
     std::map<std::string, std::map<int, double>> word_to_document_freqs_;
     
     std::map<int, std::map<std::string, double>> id_to_word_freqs_;
-
-    std::map<std::string, double> empty;
     
     std::map<int, DocumentData> documents_;
     

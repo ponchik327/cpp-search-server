@@ -17,6 +17,7 @@ set<int>::const_iterator SearchServer::end() const{
 }
 
 const map<string, double>& SearchServer::GetWordFrequencies(int document_id) const{
+    static map<std::string, double> empty;
     if (id_to_word_freqs_.count(document_id)) {
         return id_to_word_freqs_.at(document_id);   
     } else {
