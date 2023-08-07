@@ -3,12 +3,11 @@
 #include <mutex>
 #include <type_traits>
 #include <cstdint>
+#include <stdexcept>
 
 template <typename Key, typename Value>
 class ConcurrentMap {
 public:
-    static_assert(std::is_integral_v<Key>, "ConcurrentMap supports only integer keys");
-
     struct Access {
         std::lock_guard<std::mutex> guard;
         Value& ref_to_value;
@@ -19,11 +18,20 @@ public:
         , mutexs_(bucket_count)
         , bucket_count_(bucket_count)
     {
+        if (!std::is_integral_v<Key>) {
+            throw std::logic_error("ConcurrentMap supports only integer keys");
+        }
     }
 
     Access operator[](const Key& key) {
         auto index = (uint64_t)key % bucket_count_;
         return Access{ std::lock_guard(mutexs_[index]), buckets_[index][key] };
+    }
+
+    void Erase(const Key& key) {
+        auto index = (uint64_t)key % bucket_count_;
+        std::lock_guard g(mutexs_[index]);
+        buckets_[index].erase(key);
     }
 
     std::map<Key, Value> BuildOrdinaryMap() {

@@ -50,8 +50,8 @@ vector<string> GenerateQueries(mt19937& generator, const vector<string>& diction
 }
 int main() {
     mt19937 generator;
-    const auto dictionary = GenerateDictionary(generator, 100, 10);
-    const auto documents = GenerateQueries(generator, dictionary, 100'000, 70);
+    const auto dictionary = GenerateDictionary(generator, 10, 10);
+    const auto documents = GenerateQueries(generator, dictionary, 1000, 10);
     SearchServer search_server(dictionary[0]);
     for (size_t i = 0; i < documents.size(); ++i) {
         search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
@@ -63,6 +63,6 @@ int main() {
     {LOG_DURATION("par");
     res_par = search_server.FindTopDocuments(execution::par, documents[0]);
     }
-    cin.get();
+    cout << "OK!" << endl;
     return 0;
 }

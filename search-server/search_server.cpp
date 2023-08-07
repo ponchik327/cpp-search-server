@@ -2,6 +2,8 @@
 
 using namespace std;
 
+using namespace std::string_literals;
+
 void SearchServer::RemoveDocument(int document_id) {
     RemoveDocument(execution::seq, document_id);
 }
@@ -64,22 +66,16 @@ int SearchServer::GetDocumentCount() const {
         return documents_.size();
     }
 
-tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(const string_view raw_query, int document_id) const {
+tuple<SearchServer::MatchWords, DocumentStatus> SearchServer::MatchDocument(const string_view raw_query, int document_id) const {
     return MatchDocument(execution::seq, raw_query, document_id);
 }
 
-tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(execution::sequenced_policy policy, const string_view raw_query, int document_id) const {
+tuple<SearchServer::MatchWords, DocumentStatus> SearchServer::MatchDocument(execution::sequenced_policy policy, const string_view raw_query, int document_id) const {
         if (!documents_.count(document_id)) {
             throw out_of_range("Defunct document_id"s);
         }
     
-        auto query = ParseQuery(raw_query);
-    
-        sort(policy, query.plus_words.begin(), query.plus_words.end());
-        query.plus_words.erase(unique(policy, query.plus_words.begin(), query.plus_words.end()), query.plus_words.end());
-        
-        sort(policy, query.minus_words.begin(), query.minus_words.end());
-        query.minus_words.erase(unique(policy, query.minus_words.begin(), query.minus_words.end()), query.minus_words.end());
+        auto query = ParseQuery(raw_query, true);
         
         bool found_minus_word = false; 
         for (const string_view word : query.minus_words) {
@@ -112,7 +108,7 @@ tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(execution
         throw out_of_range("Defunct document_id"s);
     }
     
-    auto query = ParseQuery(raw_query);
+    auto query = ParseQuery(raw_query, false);
     
     bool found_minus_word = any_of(policy, query.minus_words.begin(), query.minus_words.end(), [this, &document_id](const string_view word){
         if (word_to_document_freqs_.count(word)) {
@@ -167,10 +163,7 @@ int SearchServer::ComputeAverageRating(const vector<int>& ratings) {
         if (ratings.empty()) {
             return 0;
         }
-        int rating_sum = 0;
-        for (const int rating : ratings) {
-            rating_sum += rating;
-        }
+        int rating_sum = accumulate(ratings.begin(), ratings.end(), 0);
         return rating_sum / static_cast<int>(ratings.size());
     }
 
@@ -191,7 +184,7 @@ SearchServer::QueryWord SearchServer::ParseQueryWord(const string_view text) con
         return {word, is_minus, IsStopWord(word)};
     }
 
-SearchServer::Query SearchServer::ParseQuery(const string_view text) const {
+SearchServer::Query SearchServer::ParseQuery(const string_view text, bool need_sort) const {
         SearchServer::Query result;
         for (const string_view word : SplitIntoWords(text)) {
             const auto query_word = ParseQueryWord(word);
@@ -202,6 +195,12 @@ SearchServer::Query SearchServer::ParseQuery(const string_view text) const {
                     result.plus_words.push_back(query_word.data);
                 }
             }
+        }
+        if (need_sort) {
+            sort(result.plus_words.begin(), result.plus_words.end());
+            result.plus_words.erase(unique(result.plus_words.begin(), result.plus_words.end()), result.plus_words.end());
+            sort(result.minus_words.begin(), result.minus_words.end());
+            result.minus_words.erase(unique(result.minus_words.begin(), result.minus_words.end()), result.minus_words.end());
         }
         return result;
     }

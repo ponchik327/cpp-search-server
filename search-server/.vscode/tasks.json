@@ -1,15 +1,22 @@
-/*{
+{
     "tasks": [
         {
             "type": "cppbuild",
-            "label": "C/C++: g++.exe сборка активного файла",
+            "label": "My build task",
             "command": "C:\\msys64\\mingw64\\bin\\g++.exe",
             "args": [
                 "-fdiagnostics-color=always",
                 "-g",
-                "${file}",
+                "main.cpp",
+                "document.cpp",
+                "read_input_functions.cpp",
+                "remove_duplicates.cpp",
+                "request_queue.cpp",
+                "search_server.cpp",
+                "string_processing.cpp",
+                "test_example_functions.cpp",
                 "-o",
-                "${fileDirname}\\${fileBasenameNoExtension}.exe"
+                "out.exe"
             ],
             "options": {
                 "cwd": "${fileDirname}"
@@ -25,23 +32,4 @@
         }
     ],
     "version": "2.0.0"
-}*/
-
-{
-    "version": "2.0.0",
-    "command": "C:\\msys64\\mingw64\\bin\\g++.exe",
-    "args": [
-       "-fdiagnostics-color=always",
-        "-g",
-        "main.cpp",
-        "document.cpp",
-        "read_input_functions.cpp",
-        "remove_duplicates.cpp",
-        "request_queue.cpp",
-        "search_server.cpp",
-        "string_processing.cpp",
-        "test_example_functions.cpp",
-        "-o",
-        "out.exe"
-    ]
 }
